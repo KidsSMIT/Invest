@@ -18,6 +18,6 @@ First version made made by Chidozie J Nnaji
 >> 2. Create an account on the local server or use a already created account
 >> 3. Once logged in you will be taking to a profile page, where all your stats will be displayed and there will be a button that will take you to investment page, where you could get investing and have fun playing :)
 >>__Side note__
->>>The is no logout screen so if you wish to log out or join a new server you will have to all together quit the game and start it up again.
+>>>There is no logout screen so if you wish to log out or join a new server you will have to all together quit the game and start it up again.
 
 If any issues please report, or if you would like an update or a feauture to be added, my email is: codingwithcn@gmail.com I will be happy to read through the emails to make anty needed updates
