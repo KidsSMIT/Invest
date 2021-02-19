@@ -20,4 +20,4 @@ First version made made by Chidozie J Nnaji
 >>__Side note__
 >>>There is no logout screen so if you wish to log out or join a new server you will have to all together quit the game and start it up again.
 
-If any issues please report, or if you would like an update or a feauture to be added, my email is: codingwithcn@gmail.com I will be happy to read through the emails to make anty needed updates
+If any issues please report, or if you would like an update or a feauture to be added, my email is: codingwithcn@gmail.com I will be happy to read through the emails to make any needed updates
