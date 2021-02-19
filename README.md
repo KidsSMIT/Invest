@@ -13,7 +13,7 @@ First version made made by Chidozie J Nnaji
 >>>If you hit the 'Stop Server' button but are not closing the server application wait for at least a minute before click the 'Start Server' button again because when clicking the end server we have to wait to stop all threads if not what this will do is create mutiple threads that might put to much stress on your system or cause problems to your game data.
 
 
->__How to user Client app__
+>__How to use Client app__
 >> 1. First log into a local server
 >> 2. Create an account on the local server or use a already created account
 >> 3. Once logged in you will be taking to a profile page, where all your stats will be displayed and there will be a button that will take you to investment page, where you could get investing and have fun playing :)
