@@ -18,6 +18,27 @@ from kivy.config import Config
 import requests
 class User:
     IP = None
+    id = None
+    name = None
+    password = None
+    cost = None 
+    money = None 
+    gain=None
+    active = True
+    def update_all(id=None, name=None, password=None, money=None, gain=None, cost=None):
+        if id != None:
+            User.id = id
+        if name != None:
+            User.name = name
+        if password != None:
+            User.password = password 
+        if cost != None:
+            User.cost=cost
+        if money !=  None:
+            User.money = money 
+        if gain !=None:
+            User.gain = gain
+
 class GetIP(Screen):
     manager = None
     def __init__(self, **args):
@@ -109,8 +130,8 @@ class Login(Screen):
         if exact_user.json()['is_it_correct'] == True:
             data = exact_user.json()['data']
             print(data)
-            User.update_all(id=data[0], name=data[1], password=data[2], worth=data[3], 
-            cost=data[4], daily_gain=data[5], money=data[6], investment=data[7])
+            User.update_all(id=data[0], name=data[1], password=data[2], money=data[3], 
+            gain=data[4], cost=data[5])
             self.manager.current = 'Profile'
         else:
             false = RelativeLayout(size_hint=(.4, 2))
@@ -125,13 +146,13 @@ class Login(Screen):
         false = RelativeLayout(size_hint=(.4, 2))
         false.add_widget(Label(text='Username:', font_size=25, size_hint=(.3, .3),
                                     pos_hint={'center_x': .25, 'center_y': .4}))
-        user = TextInput(text='username',
+        user = TextInput(
             multiline=False, readonly=False, halign='right', font_size=25, size_hint=(.4,.1), pos_hint={'center_x': .65, 'center_y': .4}
         )
         false.add_widget(user)
-        false.add_widget(Label(text='Password:', font_size=25, size_hint=(.3,.3), pos_hint={'center_x': .25, 'center_y':.3}))
+        false.add_widget(Label(text='Password:', font_size=20, size_hint=(.3,.3), pos_hint={'center_x': .25, 'center_y':.3}))
         password = TextInput(
-            multiline=False, readonly=False, halign='right', font_size=25, size_hint=(.4,.1), pos_hint={'center_x': .65, 'center_y': .3}, password=True
+            multiline=False, readonly=False, halign='right', font_size=20, size_hint=(.4,.1), pos_hint={'center_x': .65, 'center_y': .3}, password=True
         )
         false.add_widget(password)
         def logs(*args):
@@ -147,7 +168,7 @@ class Login(Screen):
                     close.bind(on_release=poped.dismiss)
             else:
                 falsed = RelativeLayout(size_hint=(.4, 2))
-                falsed.add_widget(Label(text='Problem creating new user please try again', font_size=20, size_hint=(.3, .3),
+                falsed.add_widget(Label(text='Problem creating new user, user already created', font_size=20, size_hint=(.3, .3),
                                             pos_hint={'center_x': .5, 'center_y': .4}))
                 close = Button(text='Close', size_hint=(.2, .1), pos_hint={'center_x': .5, 'center_y': .1})
                 falsed.add_widget(close)
@@ -160,15 +181,89 @@ class Login(Screen):
         poped = Popup(title='Create new user', content=false, size_hint=(.5, .4))
         poped.open()
         close.bind(on_release=poped.dismiss)
-        
+class Profile(Screen):
+    manager=None
+    def __init__(self, **args):
+        Screen.__init__(self, name='Profile')
+    def on_pre_enter(self, *args):
+        self.add_widget(self.profile())
+    def on_leave(self, *args):
+        self.remove_widget(self.main)   
+    def profile(self, *args):
+        main = GridLayout(cols=1, rows=2)
+        mains = GridLayout(cols=3, rows=1)
+        user_infor = GridLayout(cols=1, rows=8)
+        exact_user = requests.post(url='http://'+User.IP+':5000/exact_user', json={'username': User.name, 'password': User.password})
+        infor = exact_user.json()['data']
+        user_infor.add_widget(Label(text='User Information'))
+        for infors in zip(['id', 'name', 'password', 'Money', 'Amount gained daily', 'Amount lost daily'], infor):
+            if infors[0] == 'id':
+                continue
+            else:
+                if infors[1] == str:
+                    user_infor.add_widget(Label(text=infors[0] +': '+ infors[1]))
+                else:
+                    user_infor.add_widget(Label(text=infors[0] +': '+ str(infors[1])))
+        num_comp_user = requests.post(url='http://'+User.IP+':5000/get/user/num/company', json={'username': User.name})
+        user_infor.add_widget(Label(text='# of companies user owns: ' + str(num_comp_user.json()['number'])))
+        num_comp_user = requests.post(url='http://'+User.IP+':5000/get/user/num/investor', json={'username': User.name})
+        user_infor.add_widget(Label(text='# of company user is invested in: '+ str(num_comp_user.json()['number'])))
+        name_comp = requests.post(url='http://'+User.IP+':5000/get/user/investor', json={'username': User.name})
+        problem = False
+        root=ScrollView(size_hint=(1,1), size=(Window.width, Window.height))
+        if name_comp.json()['companies_names'] == None:
+            problem = True
+        if problem == False:
+            comp_name = GridLayout(cols=1, rows=len(name_comp.json()['companies_names'])+2, spacing=10, size_hint_y=len(name_comp.json()['companies_names'])/2)
+            comp_name.add_widget(Label(text=''))
+            comp_name.add_widget(Label(text='Name of companies user is invested in', font_size=15))
+            for names in name_comp.json()['companies_names']:
+                comp_name.add_widget(Label(text=names))
+        else:
+            comp_name=GridLayout(cols=1, rows=2, spacing=10, size_hint_y=2)
+            comp_name.add_widget(Label(text=''))
+            comp_name.add_widget(Label(text='You are not invested in any company'))
+        root.add_widget(comp_name)
+        rooted=ScrollView(size_hint=(1,1), size=(Window.width, Window.height))
+        name_of_owned_comp=requests.post(url='http://'+User.IP+':5000/get/user/own_comp', json={'username': User.name})
+        problem = False
+        if name_of_owned_comp.json()['Companies name'] == None:
+            problem=True
+        if problem == False:
+            user_comp_owned = GridLayout(cols=1, rows=len(name_of_owned_comp.json()['Companies name'])+2, spacing=10, size_hint_y=len(name_of_owned_comp.json()['Companies name'])/2)
+            user_comp_owned.add_widget(Label(text=''))
+            user_comp_owned.add_widget(Label(text='Name of companies the user owns', font_size=15))
+            for name in name_of_owned_comp.json()['Companies name']:
+                user_comp_owned.add_widget(Label(text=name))
+        else:
+            user_comp_owned = GridLayout(cols=1, rows=2, spacing=10, size_hint_y=1)
+            user_comp_owned.add_widget(Label(text=''))
+            user_comp_owned.add_widget(Label(text='You do not own any companies', font_size=15))
+        rooted.add_widget(user_comp_owned)
+        mains.add_widget(user_infor)
+        mains.add_widget(root)
+        mains.add_widget(rooted)
+        top = GridLayout(cols=2, rows=1, size_hint=(.3,.1))
+        top.add_widget(Button(text='Profile', color='green', size_hint=(.1, .1),  background_color ='black'))
+        top.add_widget(Button(text='Invest',on_release=self.gotoinvest,  background_color ='black', size_hint=(.1,.1)))
+        main.add_widget(top)
+        main.add_widget(mains)
+        self.main = main
+        return self.main
+    def gotoinvest(self, *args):
+        self.manager.current='Invest'
+
+
 
 sm = ScreenManager()
 sm.title='InvestIt'
 users = User()
 sm.add_widget(GetIP())
 sm.add_widget(Login())
+sm.add_widget(Profile())
 Login.manager = sm
 GetIP.manager = sm 
+Profile.manager= sm
 class TradeIt(App):
     def build(self):
         Window.bind(on_request_close=self.close_win)

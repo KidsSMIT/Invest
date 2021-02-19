@@ -25,10 +25,20 @@ def new_user():
     query = 'INSERT INTO users (id, name, password) VALUES (NULL,{},{})'.format(data['name'], data['password'])
     try:
         print(query)
-        cursor.execute('INSERT INTO users VALUES (NULL,?,?)', (data['name'], data['password']))
-        conn.commit()
-        re = {'Success': True}
-        return jsonify(re)
+        try:
+            cursor.execute('select id from users where name="{}"')
+            exist = cursor.fetchone()
+        except Exception as e:
+            exist=False
+        if exist==None or exist==False:
+            cursor.execute('INSERT INTO users VALUES (NULL,?,?,?,?,?)', (data['name'], data['password'],1000, 0, 0))
+            conn.commit()
+            re = {'Success': True}
+            return jsonify(re)
+        else:
+            print(exist)
+            re ={'Success':False}
+            return jsonify(re)
     except Exception as e:
         print(e)
         print('Problem at server on line 32')
@@ -56,8 +66,55 @@ def api_user():
     else:
         res ={'is_it_correct':False}
     return jsonify(res) 
+@app.route('/get/user/num/company', methods=['POST'])
+def get_user_comp():
+    data = json.loads(request.data.decode())
+    conn = sqlite3.connect('server.db')
+    cursor = conn.cursor()
+    query="""select count(*) from companies join users on companies.company_owner_id = users.id where users.name='{}';""".format(data['username'])
+    cursor.execute(query)
+    grab = cursor.fetchone()
+    re = {'number': grab[0]}
+    print(re)
+    conn.close()
+    return jsonify(re)
+@app.route('/get/user/num/investor', methods=['POST'])
+def get_user_inves():
+    data = json.loads(request.data.decode())
+    conn = sqlite3.connect('server.db')
+    cursor = conn.cursor()
+    query = """select count(*) from investors join users on investors.investor_id=users.id where users.name='{}';""".format(data['username'])
+    cursor.execute(query)
+    num = cursor.fetchone()
+    re = {'number': num[0]}
+    print(re)
+    conn.close()
+    return jsonify(re)
+@app.route('/get/user/investor', methods=['POST'])
+def get_user_investment():
+    data = json.loads(request.data.decode())
+    conn = sqlite3.connect('server.db')
+    cursor = conn.cursor()
+    query = """select company_name from investors join users on investors.investor_id=users.id join companies on 
+            investors.company_id = companies.id where name='{}';""".format(data['username'])
+    cursor.execute(query)
+    names = cursor.fetchall()
+    re = {'companies_names': names}
+    print(re)
+    conn.close()
+    return jsonify(re)
+@app.route('/get/user/own_comp', methods=["POST"])
+def user_owned_comp():
+    data = json.loads(request.data.decode())
+    conn = sqlite3.connect('server.db')
+    cursor=conn.cursor()
+    query = """select name from companies join users on companies.company_owner_id=users.id where name='{}';""".format(data['username'])
+    cursor.execute(query)
+    comp_names = cursor.fetchall()
+    conn.close()
+    re = {'Companies name': comp_names}
+    return jsonify(re)
 class ServerThread(threading.Thread):
-
     def __init__(self, app):
         threading.Thread.__init__(self)
         self.srv = make_server(IP, 5000, app)
@@ -110,6 +167,12 @@ if __name__ =='__main__':
             self.remove_widget(self.main)
         def mains(self, *args):
             main = GridLayout(cols =1, rows=4)
+            bottom = GridLayout(cols=4, rows=1)
+            bottom.add_widget(Button(text='Server', color='green', background_color='black'))
+            bottom.add_widget(Button(text='Users', on_release=self.gotous, background_color='black'))
+            bottom.add_widget(Button(text='Companies', on_release=self.gotocomp, background_color='black'))
+            bottom.add_widget(Button(text='Investors', on_release=self.gotoin, background_color='black'))
+            main.add_widget(bottom)
             if self.is_server_running:
                 self.servertext=Label(text='Server is running')
             else:
@@ -122,12 +185,6 @@ if __name__ =='__main__':
             else:
                 self.serverbutton = Button(text='Start Server', background_color='green', on_release=self.serverrun)
             main.add_widget(self.serverbutton)
-            bottom = GridLayout(cols=4, rows=1)
-            bottom.add_widget(Button(text='Server', color='green'))
-            bottom.add_widget(Button(text='Users', on_release=self.gotous))
-            bottom.add_widget(Button(text='Companies', on_release=self.gotocomp))
-            bottom.add_widget(Button(text='Investors', on_release=self.gotoin))
-            main.add_widget(bottom)
             self.main = main
             return self.main
         def gotous(self, *args):
@@ -150,6 +207,133 @@ if __name__ =='__main__':
                 self.serverbutton.text='Stop Server'
                 self.serverbutton.background_color='red'
                 self.is_server_running=True
+                threading.Thread(target=self.update_companies_cost_worth_and_gain).start()
+                threading.Thread(target=self.update_companies_money).start()
+                threading.Thread(target=self.update_users_cost).start()
+                threading.Thread(target=self.update_user_money).start()
+        def update_companies_cost_worth_and_gain(self, *args):
+            while self.is_server_running:
+                conn = sqlite3.connect('server.db')
+                cursor = conn.cursor()
+                query = 'select company_name from companies;'
+                cursor.execute(query)
+                companies_name = cursor.fetchall()
+                for companies in companies_name:
+                    query = """select count(*) from investors 
+                                join companies on investors.company_id = companies.id
+                                join users on investors.investor_id=users.id where company_name='{}';""".format(companies[0])
+                    cursor.execute(query)
+                    x = cursor.fetchone()
+                    cost = 50 * x[0] + 70 * x[0] 
+                    query = """update companies set company_cost={} where company_name='{}';""".format(cost, companies[0])
+                    conn = sqlite3.connect('server.db')
+                    cursor = conn.cursor()
+                    cursor.execute(query)
+                    conn.commit()
+                    conn.close()
+                    conn = sqlite3.connect('server.db')
+                    cursor = conn.cursor()
+                    query = """select company_money from companies where company_name='{}';""".format(companies[0])
+                    cursor.execute(query)
+                    money = cursor.fetchone()
+                    worth = money[0]-cost
+                    query = """update companies set company_worth = {} where company_name='{}';""".format(worth, companies[0])
+                    top = (worth)
+                    query = """select percent from investors 
+                                join companies on investors.company_id = companies.id
+                                join users on investors.investor_id=users.id where company_name='{}' and investor_id == company_owner_id;""".format(companies[0])
+                    cursor.execute(query)
+                    percent = cursor.fetchone()[0] / 100
+                    bottom = percent * worth
+                    try:
+                        gain = top / bottom
+                    except ZeroDivisionError:
+                        gain = 0
+                    query = """update companies set company_gain={} where company_name='{}';""".format(gain, companies[0])
+                    cursor.execute(query)
+                    conn.commit()
+                conn.close()
+            print('Quitting update_companies_cost_worth_and_gain')
+        def update_companies_money(self, *args):
+            while self.is_server_running:
+                time.sleep(60)
+                conn = sqlite3.connect('server.db')
+                cursor = conn.cursor()
+                query = 'select company_name from companies;'
+                cursor.execute(query)
+                companies_name = cursor.fetchall()
+                for companies in companies_name:
+                    query = """select company_gain from companies where company_name='{}';""".format(companies[0])
+                    cursor.execute(query)
+                    gain = cursor.fetchone()
+                    query = """select company_money from companies where company_name='{}';""".format(companies[0])
+                    conn = sqlite3.connect('server.db')
+                    cursor = conn.cursor()
+                    cursor.execute(query)
+                    money=cursor.fetchone()
+                    query ="""select company_cost from companies where company_name='{}';""".format(companies[0])
+                    cursor.execute(query)
+                    cost = cursor.fetchone()
+                    print('money', money[0], 'gain', gain[0]/1440, 'cost', cost[0]/1440, 'total', money[0] + ((gain[0]/1440)-(cost[0]/1440)))
+                    query ="""update companies set company_money={} where company_name='{}';""".format(money[0] + ((gain[0]/1440)-(cost[0]/1440)), companies[0])
+                    cursor.execute(query)
+                    conn.commit()
+                conn.close()
+            print('Quitting update_companies_money')
+        def update_users_cost(self, *args):
+            while self.is_server_running:
+                query ='select name from users;'
+                conn = sqlite3.connect('server.db')
+                cursor = conn.cursor()
+                cursor.execute(query)
+                users = cursor.fetchall()
+                for user in users:
+                    query="""select company_worth, percent from investors
+                        join companies on investors.company_id = companies.id
+                        join users on investors.investor_id = users.id where name='{}';""".format(user[0])
+                    cursor.execute(query)
+                    cost = 0 
+                    needed_infor = cursor.fetchall()
+                    for infor in needed_infor:
+                        cost += infor[0] * (infor[1]/100)
+                    query = """update users set user_cost={} where name='{}'""".format(cost, user[0])
+                    cursor.execute(query)
+                    conn.commit()
+                    conn = sqlite3.connect('server.db')
+                    cursor = conn.cursor()
+                    query = """select company_gain, percent from investors 
+                                join companies on investors.company_id = companies.id
+                                join users on investors.investor_id = users.id where name='{}'""".format(user[0])
+                    cursor.execute(query)
+                    gains_infor = cursor.fetchall()
+                    gain = 0
+                    for gains in gains_infor:
+                        gain += gains[0] *(gains[1]/100)
+                    query = """update users set user_gain={} where name='{}'""".format(gain, user[0])
+                    cursor.execute(query)
+                    conn.commit()
+                conn.close()
+            print('Quitting update_users_cost')
+        def update_user_money(self, *args):
+            while self.is_server_running:
+                time.sleep(60)
+                query ='select name from users;'
+                conn = sqlite3.connect('server.db')
+                cursor = conn.cursor()
+                cursor.execute(query)
+                users = cursor.fetchall()
+                for user in users:
+                    query = """select user_gain, user_cost, user_money from users where name='{}'""".format(user[0])
+                    cursor.execute(query)
+                    use_data = cursor.fetchone()
+                    gain = (use_data[0]/1440) - (use_data[1]/1440)
+                    print('gain', gain, 'money before gain', use_data[2], 'money after gain', use_data[2] + gain)
+                    money = use_data[2] + gain
+                    query = """update users set user_money={} where name='{}'""".format(money, user[0])
+                    cursor.execute(query)
+                    conn.commit()
+                conn.close()
+            print('Quitting update_user_money')
     class Users(Screen):
         manager= None
         def __init__(self, **args):
@@ -183,12 +367,12 @@ if __name__ =='__main__':
                 root.add_widget(box)
                 self.main = GridLayout(cols=1, rows=2)
                 bottom = GridLayout(cols=4, rows=1)
-                bottom.add_widget(Button(text='Server', on_release=self.gotous))
-                bottom.add_widget(Button(text='Users', color='green'))
-                bottom.add_widget(Button(text='Companies', on_release=self.gotocomp))
-                bottom.add_widget(Button(text='Investors', on_release=self.gotoin))
-                self.main.add_widget(root)
+                bottom.add_widget(Button(text='Server', on_release=self.gotous, background_color='black'))
+                bottom.add_widget(Button(text='Users', color='green', background_color='black'))
+                bottom.add_widget(Button(text='Companies', on_release=self.gotocomp, background_color='black'))
+                bottom.add_widget(Button(text='Investors', on_release=self.gotoin, background_color='black'))
                 self.main.add_widget(bottom)
+                self.main.add_widget(root)
                 return self.main
             else:
                 self.main = GridLayout(cols=1, rows=1)
@@ -216,6 +400,7 @@ if __name__ =='__main__':
                 print(query)
                 cursor.execute(query)
                 company = cursor.fetchall()
+                print(company)
             except Exception as e:
                 print(e)
                 print('There was a problem with server at line 221')
@@ -234,17 +419,23 @@ if __name__ =='__main__':
                     box.add_widget(b)
                 root.add_widget(box)
                 self.main= GridLayout(cols=1, rows=2)
-                self.main.add_widget(root)
                 bottom = GridLayout(cols=4, rows=1)
-                bottom.add_widget(Button(text='Server', on_release=self.gotos))
-                bottom.add_widget(Button(text='Users',on_release=self.gotous))
-                bottom.add_widget(Button(text='Companies', color='green'))
-                bottom.add_widget(Button(text='Investors', on_release=self.gotoin))
+                bottom.add_widget(Button(text='Server', on_release=self.gotos, background_color='black'))
+                bottom.add_widget(Button(text='Users',on_release=self.gotous, background_color='black'))
+                bottom.add_widget(Button(text='Companies', color='green', background_color='black'))
+                bottom.add_widget(Button(text='Investors', on_release=self.gotoin, background_color='black'))
                 self.main.add_widget(bottom)
+                self.main.add_widget(root)
                 return self.main
             else:
-                self.main = GridLayout(cols=1, rows=1)
-                self.main.add_widget(Label(text='Either you have no users or there was a problem getting user from database'))
+                self.main = GridLayout(cols=1, rows=2)
+                bottom = GridLayout(cols=4, rows=1)
+                bottom.add_widget(Button(text='Server', on_release=self.gotos, background_color='black'))
+                bottom.add_widget(Button(text='Users',on_release=self.gotous, background_color='black'))
+                bottom.add_widget(Button(text='Companies', color='green', background_color='black'))
+                bottom.add_widget(Button(text='Investors', on_release=self.gotoin, background_color='black'))
+                self.main.add_widget(bottom)
+                self.main.add_widget(Label(text='Either you have no companies or there was a problem getting user from database'))
                 return self.main
         def gotos(self, *args):
             self.manager.current='Main'
@@ -316,10 +507,10 @@ if __name__ =='__main__':
             root.add_widget(main)
             mains = GridLayout(cols=1, rows=3)
             bottom = GridLayout(cols=4, rows=1)
-            bottom.add_widget(Button(text='Server', on_release=self.gotos))
-            bottom.add_widget(Button(text='Users',on_release=self.gotous))
-            bottom.add_widget(Button(text='Companies', on_release=self.gotocom))
-            bottom.add_widget(Button(text='Investors', color='green'))
+            bottom.add_widget(Button(text='Server', on_release=self.gotos, background_color='black'))
+            bottom.add_widget(Button(text='Users',on_release=self.gotous, background_color='black'))
+            bottom.add_widget(Button(text='Companies', on_release=self.gotocom, background_color='black'))
+            bottom.add_widget(Button(text='Investors', color='green', background_color='black'))
             mains.add_widget(bottom)
             mains.add_widget(root)
             self.main = mains 
@@ -357,4 +548,5 @@ if __name__ =='__main__':
             popup.open()
         def close_all_thanks(self, *args):
             App.get_running_app().stop()
+        
     Server().run()
